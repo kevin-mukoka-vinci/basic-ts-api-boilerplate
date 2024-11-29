@@ -1,7 +1,12 @@
 import { Router } from "express";
 import { Drink } from "../types";
+import path from "node:path";
+import { parse, serialize } from "../utils/json";
 
-const drinks: Drink[] = [
+const jsonDbPath = path.join(__dirname, "/../data/drinks.json");
+
+
+const defaultDrinks: Drink[] = [
   {
     id: 1,
     title: "Coca-Cola",
@@ -46,8 +51,54 @@ const drinks: Drink[] = [
 
 const router = Router();
 
-router.get("/", (_req, res) => {
-  return res.json(drinks);
+router.get("/", (req, res) => {
+  const drinks = parse(jsonDbPath, defaultDrinks);
+  if (!req.query["budget-max"]) {
+    return res.json(drinks);
+  }
+  const budgetMax = Number(req.query["budget-max"]);
+  const filteredDrinks = drinks.filter((drink) => drink.price <= budgetMax);
+  return res.json(filteredDrinks);
 });
+
+router.post("/", (req, res) => {
+  const drinks = parse(jsonDbPath, defaultDrinks);
+
+  const newDrink: Drink = {
+    id: drinks.length + 1,
+    ...req.body,
+  };
+
+  drinks.push(newDrink);
+  serialize(jsonDbPath, drinks);
+
+  res.status(201).json(newDrink);
+});
+
+router.get("/:id", (req, res) => {
+  const id = Number(req.params.id);
+  const drinks = parse(jsonDbPath, defaultDrinks);
+  const drink = drinks.find((drink) => drink.id === id);
+  if (!drink) {
+    return res.sendStatus(404);
+  }
+  return res.json(drink);
+});
+
+
+
+router.delete("/:id", (req, res) => {
+  const id = Number(req.params.id);
+  const drinks = parse(jsonDbPath, defaultDrinks);
+  const index = drinks.findIndex((drink) => drink.id === id);
+  if (index === -1) {
+    return res.sendStatus(404);
+  }
+  const deletedElements = drinks.splice(index, 1);
+  serialize(jsonDbPath, drinks);
+  return res.json(deletedElements[0]);
+});
+
+
 
 export default router;
